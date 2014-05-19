@@ -3,18 +3,24 @@ package main
 import (
 	"os"
 	"os/exec"
-	"fmt"
 	"errors"
 	"strings"
 	"flag"
+	"log"
 )
 
 var debug = false
 
-func remoteUrl() (string, error) {
-	if debug {
-		fmt.Println("git config --get remote.origin.url")
+var logger = log.New(os.Stderr, "", log.LstdFlags)
+
+func debugf(msg string) {
+	if (debug) {
+		logger.Printf(msg)
 	}
+}
+
+func remoteUrl() (string, error) {
+	debugf("git config --get remote.origin.url")
 	cmd := exec.Command("git", "config", "--get", "remote.origin.url")
 	res, err := cmd.CombinedOutput()
 	if err != nil {
@@ -34,29 +40,21 @@ func remoteBranch(url string) (string, error) {
 }
 
 func checkoutRemote(branch string) error {
-	if (debug) {
-		fmt.Println("git fetch origin")
-	}
+	debugf("git fetch origin")
 	err := exec.Command("git", "fetch", "origin").Run()
 	if err != nil {
 		return err
 	}
-	if debug {
-		fmt.Println("git checkout local-" + branch)
-	}
+	debugf("git checkout local-" + branch)
 	err = exec.Command("git", "checkout", "local-" + branch).Run()
 	if err != nil {
-		if debug {
-			fmt.Println("git checkout -t origin/" + branch + " -b local-" + branch)
-		}
+		debugf("git checkout -t origin/" + branch + " -b local-" + branch)
 		err = exec.Command("git", "checkout", "-t", "origin/" + branch, "-b", "local-" + branch).Run()
 		if err != nil {
 			return err
 		}
 	}
-	if debug {
-		fmt.Println("git reset origin/" + branch)
-	}
+	debugf("git reset origin/" + branch)
 	return exec.Command("git", "reset", "origin/" + branch).Run()
 }
 
@@ -65,23 +63,16 @@ func main() {
 	flag.Parse()
 	url, err := remoteUrl()
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		log.Fatalf(err.Error())
 	}
-	if debug {
-		fmt.Println("origin url", url)
-	}
+	debugf("origin url " + url)
 	remote, err := remoteBranch(url)
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		log.Fatalf(err.Error())
 	}
-	if debug {
-		fmt.Println("origin branch", remote)
-	}
+	debugf("origin branch " + remote)
 	err = checkoutRemote(remote)
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		log.Fatalf(err.Error())
 	}
 }

@@ -12,10 +12,13 @@ import (
 var debug = false
 
 func remoteUrl() (string, error) {
+	if debug {
+		fmt.Println("git config --get remote.origin.url")
+	}
 	cmd := exec.Command("git", "config", "--get", "remote.origin.url")
 	res, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", err
+		return "", errors.New("Not a git repository, git config got " + err.Error())
 	}
 	if len(res) == 0 {
 		return "", errors.New("Not a git repository, or no origin branch")
@@ -38,12 +41,12 @@ func checkoutRemote(branch string) error {
 	if err != nil {
 		return err
 	}
-	if (debug) {
+	if debug {
 		fmt.Println("git checkout local-" + branch)
 	}
 	err = exec.Command("git", "checkout", "local-" + branch).Run()
 	if err != nil {
-		if (debug) {
+		if debug {
 			fmt.Println("git checkout -t origin/" + branch + " -b local-" + branch)
 		}
 		err = exec.Command("git", "checkout", "-t", "origin/" + branch, "-b", "local-" + branch).Run()
@@ -51,7 +54,7 @@ func checkoutRemote(branch string) error {
 			return err
 		}
 	}
-	if (debug) {
+	if debug {
 		fmt.Println("git reset origin/" + branch)
 	}
 	return exec.Command("git", "reset", "origin/" + branch).Run()
@@ -65,7 +68,7 @@ func main() {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
-	if (debug) {
+	if debug {
 		fmt.Println("origin url", url)
 	}
 	remote, err := remoteBranch(url)
@@ -73,7 +76,7 @@ func main() {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
-	if (debug) {
+	if debug {
 		fmt.Println("origin branch", remote)
 	}
 	err = checkoutRemote(remote)

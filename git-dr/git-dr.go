@@ -1,12 +1,12 @@
 package main
 
 import (
-	"os"
-	"os/exec"
 	"errors"
-	"strings"
 	"flag"
 	"log"
+	"os"
+	"os/exec"
+	"strings"
 )
 
 var debug = false
@@ -14,7 +14,7 @@ var debug = false
 var logger = log.New(os.Stderr, "", log.LstdFlags)
 
 func debugf(msg string) {
-	if (debug) {
+	if debug {
 		logger.Printf(msg)
 	}
 }
@@ -33,29 +33,24 @@ func remoteUrl() (string, error) {
 }
 
 func remoteBranch(url string) (string, error) {
-	if (strings.HasSuffix(url, "spotify-puppet")) {
+	if strings.HasSuffix(url, "spotify-puppet") {
 		return "production", nil
 	}
 	return "master", nil
 }
 
 func checkoutRemote(branch string) error {
-	debugf("git fetch origin")
-	err := exec.Command("git", "fetch", "origin").Run()
-	if err != nil {
-		return err
-	}
 	debugf("git checkout local-" + branch)
-	err = exec.Command("git", "checkout", "local-" + branch).Run()
+	err := exec.Command("git", "checkout", "local-"+branch).Run()
 	if err != nil {
 		debugf("git checkout -t origin/" + branch + " -b local-" + branch)
-		err = exec.Command("git", "checkout", "-t", "origin/" + branch, "-b", "local-" + branch).Run()
+		err = exec.Command("git", "checkout", "-t", "origin/"+branch, "-b", "local-"+branch).Run()
 		if err != nil {
 			return err
 		}
 	}
-	debugf("git reset origin/" + branch)
-	return exec.Command("git", "reset", "origin/" + branch).Run()
+	debugf("git pull")
+	return exec.Command("git", "pull").Run()
 }
 
 func main() {

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"github.com/jwiklund/tools/debug"
 	"github.com/jwiklund/tools/gogit"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -27,7 +29,19 @@ func sliceToString(slices []string) string {
 }
 
 func reviewers() ([]string, error) {
-	return []string{"roes", "martina"}, nil
+	r, err := os.Open("/home/jwiklund/reviewer")
+	if err != nil {
+		return nil, err
+	}
+	var lines []string
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		line := strings.TrimSpace(string(scanner.Text()))
+		if len(line) > 0 {
+			lines = append(lines, line)
+		}
+	}
+	return lines, nil
 }
 
 func main() {

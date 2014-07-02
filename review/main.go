@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"flag"
+	"fmt"
 	"github.com/jwiklund/tools/debug"
 	"github.com/jwiklund/tools/gogit"
 	"os"
@@ -70,8 +71,8 @@ func main() {
 
 	cmd := exec.Command("/usr/local/bin/git-review", args...)
 	output, err := cmd.CombinedOutput()
+	fmt.Printf(string(output))
 	if err != nil {
-		debug.Log(string(output))
 		debug.Fatalf(err.Error())
 	}
 }

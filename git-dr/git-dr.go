@@ -16,6 +16,11 @@ func remoteBranch(url string) (string, error) {
 }
 
 func checkoutRemote(branch string) error {
+	debug.Log("git fetch")
+	if err := exec.Command("git", "fetch").Run(); err != nil {
+		return err
+	}
+
 	debug.Log("git checkout local-" + branch)
 	err := exec.Command("git", "checkout", "local-"+branch).Run()
 	if err == nil {

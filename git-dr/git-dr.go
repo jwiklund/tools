@@ -24,6 +24,11 @@ func checkoutRemote(branch string) error {
 	debug.Log("git checkout local-" + branch)
 	err := exec.Command("git", "checkout", "local-"+branch).Run()
 	if err == nil {
+		debug.Log("git pull origin master")
+		output, err := exec.Command("git", "pull", "origin", "master").CombinedOutput()
+		if err != nil {
+			debug.Log(string(output))
+		}
 		debug.Log("git reset origin/" + branch)
 		err = exec.Command("git", "reset", "origin/"+branch).Run()
 		if err != nil {

@@ -22,10 +22,16 @@ func checkoutRemote(branch string) error {
 	}
 
 	debug.Log("git checkout local-" + branch)
-	err := exec.Command("git", "checkout", "local-"+branch).Run()
-	if err == nil {
+	output, err := exec.Command("git", "checkout", "local-"+branch).CombinedOutput()
+	if err != nil && strings.HasPrefix(string(output), "error: pathspec ") {
+		debug.Log("git checkout -t origin/" + branch + " -b local-" + branch)
+		err = exec.Command("git", "checkout", "-t", "origin/"+branch, "-b", "local-"+branch).Run()
+		if err != nil {
+			return err
+		}
+	} else if err == nil {
 		debug.Log("git pull origin master")
-		output, err := exec.Command("git", "pull", "origin", branch).CombinedOutput()
+		output, err = exec.Command("git", "pull", "origin", branch).CombinedOutput()
 		if err != nil {
 			debug.Fatalf(string(output))
 		}
@@ -35,11 +41,7 @@ func checkoutRemote(branch string) error {
 			return err
 		}
 	} else {
-		debug.Log("git checkout -t origin/" + branch + " -b local-" + branch)
-		err = exec.Command("git", "checkout", "-t", "origin/"+branch, "-b", "local-"+branch).Run()
-		if err != nil {
-			return err
-		}
+		debug.Fatalf(string(output))
 	}
 	debug.Log("git pull")
 	return exec.Command("git", "pull").Run()

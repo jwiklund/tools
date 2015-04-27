@@ -8,43 +8,37 @@ import (
 	"strings"
 )
 
-func remoteBranch(url string) (string, error) {
-	if strings.HasSuffix(url, "spotify-puppet") {
-		return "production", nil
+func remote(url string) (string, error) {
+	if strings.HasSuffix(url, "spotify-puppet.git") {
+		return "upstream", nil
 	}
-	return "master", nil
+	return "origin", nil
 }
 
-func checkoutRemote(branch string) error {
-	debug.Log("git fetch")
-	if err := exec.Command("git", "fetch").Run(); err != nil {
+func checkoutRemote(branch, remote string) error {
+	debug.Log("git fetch " + remote)
+	if err := exec.Command("git", "fetch", remote).Run(); err != nil {
 		return err
 	}
 
 	debug.Log("git checkout local-" + branch)
 	output, err := exec.Command("git", "checkout", "local-"+branch).CombinedOutput()
 	if err != nil && strings.HasPrefix(string(output), "error: pathspec ") {
-		debug.Log("git checkout -t origin/" + branch + " -b local-" + branch)
-		err = exec.Command("git", "checkout", "-t", "origin/"+branch, "-b", "local-"+branch).Run()
+		debug.Log("git checkout -t " + remote + "/" + branch + " -b local-" + branch)
+		err = exec.Command("git", "checkout", "-t", remote+"/"+branch, "-b", "local-"+branch).Run()
 		if err != nil {
 			return err
 		}
 	} else if err == nil {
-		debug.Log("git pull origin master")
-		output, err = exec.Command("git", "pull", "origin", branch).CombinedOutput()
-		if err != nil {
-			debug.Fatalf(string(output))
-		}
-		debug.Log("git reset origin/" + branch)
-		err = exec.Command("git", "reset", "origin/"+branch).Run()
+		debug.Log("git reset " + remote + "/" + branch)
+		err = exec.Command("git", "reset", remote+"/"+branch).Run()
 		if err != nil {
 			return err
 		}
 	} else {
 		debug.Fatalf(string(output))
 	}
-	debug.Log("git pull")
-	return exec.Command("git", "pull").Run()
+	return err
 }
 
 func main() {
@@ -56,12 +50,12 @@ func main() {
 		debug.Fatalf(err.Error())
 	}
 	debug.Log("origin url " + url)
-	remote, err := remoteBranch(url)
+	remote, err := remote(url)
 	if err != nil {
 		debug.Fatalf(err.Error())
 	}
-	debug.Log("origin branch " + remote)
-	err = checkoutRemote(remote)
+	debug.Log("remote " + remote)
+	err = checkoutRemote("master", remote)
 	if err != nil {
 		debug.Fatalf(err.Error())
 	}

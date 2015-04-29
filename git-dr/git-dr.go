@@ -30,6 +30,11 @@ func checkoutRemote(branch, remote string) error {
 			return err
 		}
 	} else if err == nil {
+		debug.Log("git merge " + remote + "/" + branch)
+		err = exec.Command("git", "merge", remote+"/"+branch).Run()
+		if err != nil {
+			debug.Log("merge failed (" + err.Error() + "), ignoring")
+		}
 		debug.Log("git reset " + remote + "/" + branch)
 		err = exec.Command("git", "reset", remote+"/"+branch).Run()
 		if err != nil {

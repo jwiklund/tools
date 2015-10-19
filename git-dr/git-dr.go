@@ -12,6 +12,12 @@ func remote(url string) (string, error) {
 	if strings.HasSuffix(url, "spotify-puppet.git") {
 		return "upstream", nil
 	}
+	if strings.HasSuffix(url, "dns-data.git") {
+	        return "upstream", nil
+        }
+	if strings.HasSuffix(url, "user-policy.git") {
+                return "upstream", nil	    
+	}
 	return "origin", nil
 }
 

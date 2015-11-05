@@ -3,13 +3,17 @@ package main
 import (
 	"flag"
 	"github.com/jwiklund/tools/debug"
-	"github.com/jwiklund/tools/gogit"
 	"os/exec"
 	"strings"
 )
 
-func remote(url string) (string, error) {
-	if anyOf(url, "spotify-puppet.git", "dns-data.git", "user-policy.git", "agglib-common.git") {
+func remote() (string, error) {
+	debug.Log("git remote")
+	output, err := exec.Command("git", "remote").CombinedOutput()
+	if err != nil {
+		return "", err
+	}
+	if strings.Contains(string(output), "upstream\n") {
 		return "upstream", nil
 	}
 	return "origin", nil
@@ -59,12 +63,7 @@ func main() {
 	flag.BoolVar(&debug.Enable, "debug", false, "print debug information")
 	flag.Parse()
 
-	url, err := gogit.RemoteUrl()
-	if err != nil {
-		debug.Fatalf(err.Error())
-	}
-	debug.Log("origin url " + url)
-	remote, err := remote(url)
+	remote, err := remote()
 	if err != nil {
 		debug.Fatalf(err.Error())
 	}

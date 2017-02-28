@@ -3,7 +3,6 @@ package cmd
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -92,17 +91,20 @@ func root(cmd *cobra.Command, args []string) {
 	}
 
 	for _, file := range args {
-		reader := make(chan rec, 1)
-		go read(file, delimiter, from, to, reader)
+		r, err := newReaderFile(file, delimiter, from, to)
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
 		first := true
 		var firstTime, lastTime time.Time
-		for rec := range reader {
+		for r.Read() {
 			if first {
 				first = false
-				firstTime = rec.timestamp
+				firstTime = r.rec.timestamp
 			}
-			lastTime = rec.timestamp
-			fmt.Println(result(rec, delimiter, fields))
+			lastTime = r.rec.timestamp
+			fmt.Println(result(r.rec, delimiter, fields))
 		}
 		if verbose {
 			fmt.Printf("file %s time %s to %s\n", file, firstTime, lastTime)
@@ -152,38 +154,56 @@ func parse(delimiter []byte, line []byte) (rec, error) {
 	}, nil
 }
 
-func read(file, delimiter string, from, to time.Time, output chan rec) {
-	f, err := os.OpenFile(file, os.O_RDONLY, 0)
-	if err != nil {
-		fmt.Printf("Could not open %s: %s\n", file, err)
-		return
-	}
-
-	readFile(f, delimiter, from, to, output)
-
-	f.Close()
-	close(output)
+type reader struct {
+	scanner   *bufio.Scanner
+	rec       rec
+	delimiter []byte
+	from      time.Time
+	to        time.Time
 }
 
-func readFile(in io.Reader, delimiter string, from, to time.Time, output chan rec) {
-	scanner := bufio.NewScanner(in)
-	d := []byte(delimiter)
-	zero := time.Time{}
-	for scanner.Scan() {
-		if len(scanner.Bytes()) == 0 {
-			continue
-		}
-		r, err := parse(d, scanner.Bytes())
-		if err != nil {
-			fmt.Printf("Could not parse line %s: %s\n", scanner.Text(), err)
-		} else {
-			if !from.After(r.timestamp) || from == zero {
-				if r.timestamp.Before(to) || to == zero {
-					output <- r
-				}
-			}
+func (r *reader) Read() bool {
+	more, found := r.readInternal()
+	for more && !found {
+		more, found = r.readInternal()
+	}
+	return found
+}
+
+var zero time.Time
+
+func (r *reader) readInternal() (bool, bool) {
+	if !r.scanner.Scan() {
+		return false, false
+	}
+	if len(r.scanner.Bytes()) == 0 {
+		return true, false
+	}
+	rec, err := parse(r.delimiter, r.scanner.Bytes())
+	if err != nil {
+		fmt.Printf("Could not parse line %s: %s\n", r.scanner.Text(), err)
+		return true, false
+	}
+	if !r.from.After(rec.timestamp) || r.from == zero {
+		if rec.timestamp.Before(r.to) || r.to == zero {
+			r.rec = rec
+			return true, true
 		}
 	}
+	return true, false
+}
+
+func newReaderFile(file, delimiter string, from, to time.Time) (*reader, error) {
+	f, err := os.OpenFile(file, os.O_RDONLY, 0)
+	if err != nil {
+		return nil, fmt.Errorf("coult not open %s: %s", file, err)
+	}
+	return &reader{
+		scanner:   bufio.NewScanner(f),
+		delimiter: []byte(delimiter),
+		from:      from,
+		to:        to,
+	}, nil
 }
 
 func result(r rec, delimiter string, fields []int) string {

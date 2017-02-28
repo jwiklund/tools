@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"bufio"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -15,12 +14,12 @@ func TestReadRange(t *testing.T) {
 	to, _ := time.Parse(time.RFC3339, "2017-02-13T10:00:00Z")
 	r := reader{
 		scanner:   bufio.NewScanner(strings.NewReader(str)),
-		delimiter: []byte(","),
+		delimiter: '\t',
 		from:      from,
 		to:        to,
 	}
 
-	res := fmt.Sprintf("%s", readAll(&r))
+	res := readAllDates(&r)
 	if res != "2017-02-13T09:00:00Z" {
 		t.Error("Expected 2017-02-13T09:00:00Z but got ", res)
 	}
@@ -33,12 +32,12 @@ func TestReadRangeInfiniteBegining(t *testing.T) {
 	to, _ := time.Parse(time.RFC3339, "2017-02-13T10:00:00Z")
 	r := reader{
 		scanner:   bufio.NewScanner(strings.NewReader(str)),
-		delimiter: []byte(","),
+		delimiter: '\t',
 		from:      from,
 		to:        to,
 	}
 
-	res := fmt.Sprintf("%s", readAll(&r))
+	res := readAllDates(&r)
 	if res != "2017-02-13T09:00:00Z" {
 		t.Error("Expected 2017-02-13T09:00:00Z but got ", res)
 	}
@@ -51,21 +50,59 @@ func TestReadRangeInfiniteEnding(t *testing.T) {
 	to := time.Time{}
 	r := reader{
 		scanner:   bufio.NewScanner(strings.NewReader(str)),
-		delimiter: []byte(","),
+		delimiter: '\t',
 		from:      from,
 		to:        to,
 	}
 
-	res := fmt.Sprintf("%s", readAll(&r))
+	res := readAllDates(&r)
 	if res != "2017-02-13T09:00:00Z" {
 		t.Error("Expected 2017-02-13T09:00:00Z but got ", res)
 	}
 }
 
-func readAll(r *reader) string {
+func TestReadRangeDefaults(t *testing.T) {
+	str := "2017-02-13T09:00:00Z"
+
+	r := reader{
+		scanner:   bufio.NewScanner(strings.NewReader(str)),
+		delimiter: '\t',
+	}
+
+	res := readAllDates(&r)
+	if res != "2017-02-13T09:00:00Z" {
+		t.Error("Expected 2017-02-13T09:00:00Z but got ", res)
+	}
+}
+
+func readAllDates(r *reader) string {
 	var dates []string
 	for r.Read() {
 		dates = append(dates, r.rec.timestamp.Format(time.RFC3339))
 	}
 	return strings.Join(dates, ", ")
+}
+
+func TestReadFields(t *testing.T) {
+	str := "2017-02-13T09:00:00Z\tfirst\tsecond"
+
+	r := reader{
+		scanner:   bufio.NewScanner(strings.NewReader(str)),
+		delimiter: '\t',
+	}
+
+	res := readAllFields(&r)
+	if res != "first, second" {
+		t.Error("Expected first, second but got " + res)
+	}
+}
+
+func readAllFields(r *reader) string {
+	var fields []string
+	for r.Read() {
+		for _, record := range r.rec.records {
+			fields = append(fields, string(record))
+		}
+	}
+	return strings.Join(fields, ", ")
 }

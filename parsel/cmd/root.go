@@ -3,6 +3,7 @@ package cmd
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"runtime/pprof"
@@ -105,7 +106,13 @@ func root(cmd *cobra.Command, args []string) {
 
 	output := bufio.NewWriter(os.Stdout)
 	for _, file := range args {
-		r, err := newReaderFile(file, delimiter, from, to)
+		var r *reader
+		var err error
+		if file == "-" {
+			r, err = newReader(os.Stdin, delimiter, from, to)
+		} else {
+			r, err = newReaderFile(file, delimiter, from, to)
+		}
 		if err != nil {
 			fmt.Println(err)
 			continue
@@ -148,11 +155,15 @@ func newReaderFile(file, delimiter string, from, to time.Time) (*reader, error) 
 	if err != nil {
 		return nil, fmt.Errorf("coult not open %s: %s", file, err)
 	}
+	return newReader(f, delimiter, from, to)
+}
+
+func newReader(r io.Reader, delimiter string, from, to time.Time) (*reader, error) {
 	if len(delimiter) > 1 {
 		return nil, fmt.Errorf("delimiter of size != 1 not supported")
 	}
 	return &reader{
-		scanner:   bufio.NewScanner(f),
+		scanner:   bufio.NewScanner(r),
 		delimiter: delimiter[0],
 		from:      from,
 		to:        to,
@@ -198,18 +209,13 @@ func (r *reader) readInternal() (bool, bool) {
 }
 
 func parse(delimiter byte, line []byte, rec *rec) error {
-	space := 0
-	for space < len(line) && line[space] != ' ' && line[space] != delimiter {
-		space = space + 1
-	}
-	date, err := time.Parse(time.RFC3339, string(line[0:space]))
+	var last int
+	var err error
+	last, rec.timestamp, err = parseTime(delimiter, line)
 	if err != nil {
 		return err
 	}
-	rec.timestamp = date
-
 	recs := rec.records[0:0]
-	last := space + 1
 	current := 1
 	for last+current < len(line) {
 		if line[last+current] == delimiter {
@@ -226,18 +232,41 @@ func parse(delimiter byte, line []byte, rec *rec) error {
 	return nil
 }
 
+func parseTime(delimiter byte, line []byte) (int, time.Time, error) {
+	space := 0
+	for space < len(line) && line[space] != ' ' && line[space] != delimiter {
+		space = space + 1
+	}
+	date, err := time.Parse(time.RFC3339, string(line[0:space]))
+	if err != nil {
+		return 0, time.Time{}, err
+	}
+	return space + 1, date, nil
+}
+
 func result(r rec, delimiter string, fields []int, out *bufio.Writer) {
-	out.WriteString(r.timestamp.Format(time.RFC3339))
 	if len(fields) == 0 {
+		out.WriteString(r.timestamp.Format(time.RFC3339))
 		for _, record := range r.records {
 			out.WriteString(delimiter)
 			out.Write(record)
 		}
 	} else {
+		first := true
 		for _, field := range fields {
-			if field < len(r.records) {
-				out.WriteString(delimiter)
-				out.Write(r.records[field])
+			// field 0 == timestamp
+			fieldIndex := field - 1
+			if fieldIndex < len(r.records) {
+				if first {
+					first = false
+				} else {
+					out.WriteString(delimiter)
+				}
+				if field < 0 {
+					out.WriteString(r.timestamp.Format(time.RFC3339))
+				} else {
+					out.Write(r.records[field-1])
+				}
 			}
 		}
 	}

@@ -3,6 +3,7 @@ package cmd
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -35,8 +36,8 @@ func Execute() {
 }
 
 func init() {
-	RootCmd.Flags().StringP("from", "F", "10m", "Only include items from this time")
-	RootCmd.Flags().StringP("to", "T", "0m", "Only include items until this time")
+	RootCmd.Flags().StringP("from", "F", "", "Only include items from this time")
+	RootCmd.Flags().StringP("to", "T", "", "Only include items until this time")
 	RootCmd.Flags().StringP("delimiter", "d", "\t", "Field Delimiter")
 	RootCmd.Flags().StringP("fields", "f", "", "Only return fields (eg 1,2,3-4)")
 	RootCmd.Flags().StringP("query", "q", "", "Only return lines matching query")
@@ -56,29 +57,28 @@ func root(cmd *cobra.Command, args []string) {
 	}
 
 	now := time.Now()
-	fromDuration, err := cmd.Flags().GetDuration("from")
-	var from time.Time
-	if err == nil {
-		from = now.Add(-fromDuration)
-	} else {
-		from, err = time.Parse(time.RFC3339, cmd.Flag("from").Value.String())
-		if err != nil {
-			fmt.Println("Invalid from duration|time (must be of type .*(ns|us|ms|s|m|h) or RFC3339 ie 2017-02-13T09:16:57.780+00:00)")
-			os.Exit(1)
+	parseDuration := func(what string) time.Time {
+		str := cmd.Flag(what).Value.String()
+		if str == "" {
+			return time.Time{}
 		}
-	}
 
-	toDuration, err := cmd.Flags().GetDuration("to")
-	var to time.Time
-	if err == nil {
-		to = now.Add(-toDuration)
-	} else {
-		to, err = time.Parse(time.RFC3339, cmd.Flag("to").Value.String())
-		if err != nil {
-			fmt.Println("Invalid to duration|time (must be of type .*(ns|us|ms|s|m|h) or RFC3339 ie 2017-02-13T09:16:57.780+00:00)")
-			os.Exit(1)
+		duration, err := time.ParseDuration(str)
+		if err == nil {
+			return now.Add(-duration)
 		}
+
+		t, err := time.Parse(time.RFC3339, str)
+		if err == nil {
+			return t
+		}
+
+		fmt.Printf("Invalid %s %s duration|time (must be of type .*(ns|us|ms|s|m|h) or RFC3339 ie 2017-02-13T09:16:57Z)\n", what, str)
+		os.Exit(1)
+		return now
 	}
+	from := parseDuration("from")
+	to := parseDuration("to")
 
 	if verbose {
 		fmt.Printf("Return records between %s and %s\n", from, to)
@@ -115,13 +115,13 @@ func parseFields(fields string) ([]int, error) {
 		return nil, nil
 	}
 	stringFields := strings.Split(fields, ",")
-	res := make([]int, len(stringFields))
-	for i, field := range stringFields {
+	res := make([]int, 0, len(stringFields))
+	for _, field := range stringFields {
 		fieldNr, err := strconv.Atoi(field)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse field %s: %v", field, err)
 		}
-		res[i] = fieldNr
+		res = append(res, fieldNr)
 	}
 	return res, nil
 }
@@ -136,11 +136,14 @@ func parse(delimiter []byte, line []byte) (rec, error) {
 		return rec{}, err
 	}
 
-	parts := bytes.Split(line[space+1:], delimiter)
-	recs := make([]string, len(parts))
+	var recs []string
+	if space+1 < len(line) {
+		parts := bytes.Split(line[space+1:], delimiter)
+		recs = make([]string, len(parts))
 
-	for i, part := range parts {
-		recs[i] = string(part)
+		for i, part := range parts {
+			recs[i] = string(part)
+		}
 	}
 
 	return rec{
@@ -155,33 +158,37 @@ func read(file, delimiter string, from, to time.Time, output chan rec) {
 		fmt.Printf("Could not open %s: %s\n", file, err)
 		return
 	}
-	defer f.Close()
 
-	scanner := bufio.NewScanner(f)
+	readFile(f, delimiter, from, to, output)
+
+	f.Close()
+	close(output)
+}
+
+func readFile(in io.Reader, delimiter string, from, to time.Time, output chan rec) {
+	scanner := bufio.NewScanner(in)
 	d := []byte(delimiter)
+	zero := time.Time{}
 	for scanner.Scan() {
 		if len(scanner.Bytes()) == 0 {
 			continue
 		}
 		r, err := parse(d, scanner.Bytes())
 		if err != nil {
-			fmt.Printf("Could not parse line %s", scanner.Text())
+			fmt.Printf("Could not parse line %s: %s\n", scanner.Text(), err)
 		} else {
-			if from.Before(r.timestamp) {
-				continue
+			if !from.After(r.timestamp) || from == zero {
+				if r.timestamp.Before(to) || to == zero {
+					output <- r
+				}
 			}
-			if r.timestamp.After(to) {
-				continue
-			}
-			output <- r
 		}
 	}
-	close(output)
 }
 
 func result(r rec, delimiter string, fields []int) string {
 	records := r.records
-	if fields != nil {
+	if len(fields) > 0 {
 		res := make([]string, 0, len(records))
 		for _, field := range fields {
 			if field < len(records) {
@@ -190,5 +197,5 @@ func result(r rec, delimiter string, fields []int) string {
 		}
 		records = res
 	}
-	return strings.Join(records, delimiter)
+	return r.timestamp.Format(time.RFC3339) + delimiter + strings.Join(records, delimiter)
 }

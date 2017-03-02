@@ -35,14 +35,24 @@ func Execute() {
 	}
 }
 
+var fromRaw *string
+var toRaw *string
+var delimiter *string
+var fieldsRaw *string
+var cpuprofile *string
+var filter *[]string
+var preview *bool
+var verbose *bool
+
 func init() {
-	RootCmd.Flags().StringP("from", "F", "", "Only include items from this time")
-	RootCmd.Flags().StringP("to", "T", "", "Only include items until this time")
-	RootCmd.Flags().StringP("delimiter", "d", "\t", "Field Delimiter")
-	RootCmd.Flags().StringP("fields", "f", "", "Only return fields (eg 1,2,3-4)")
-	RootCmd.Flags().StringP("query", "q", "", "Only return lines matching query")
-	RootCmd.Flags().BoolP("verbose", "v", false, "Be verbose")
-	RootCmd.Flags().String("cpuprofile", "", "Write cpuprofile to file")
+	fromRaw = RootCmd.Flags().StringP("from", "F", "", "Only include items from this time")
+	toRaw = RootCmd.Flags().StringP("to", "T", "", "Only include items until this time")
+	delimiter = RootCmd.Flags().StringP("delimiter", "d", "\t", "Field Delimiter")
+	fieldsRaw = RootCmd.Flags().StringP("fields", "f", "", "Only return fields (eg 1,2,3-4)")
+	filter = RootCmd.Flags().StringArray("filter", []string{}, "Filtering to perform")
+	cpuprofile = RootCmd.Flags().String("cpuprofile", "", "Write cpuprofile to file")
+	preview = RootCmd.Flags().Bool("preview", false, "Preview the result, only return 10 rows")
+	verbose = RootCmd.Flags().BoolP("verbose", "v", false, "Be verbose")
 }
 
 type rec struct {
@@ -51,17 +61,11 @@ type rec struct {
 }
 
 func root(cmd *cobra.Command, args []string) {
-	verbose, err := cmd.Flags().GetBool("verbose")
-	if err != nil {
-		fmt.Println("Couldn't parse verbose, assuming false", err)
-		verbose = false
-	}
-	cpuprofile := cmd.Flag("cpuprofile").Value.String()
-	if cpuprofile != "" {
-		if verbose {
-			fmt.Println("Storing cpu profile in " + cpuprofile)
+	if *cpuprofile != "" {
+		if *verbose {
+			fmt.Println("Storing cpu profile in " + *cpuprofile)
 		}
-		f, err := os.Create(cpuprofile)
+		f, err := os.Create(*cpuprofile)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -70,35 +74,33 @@ func root(cmd *cobra.Command, args []string) {
 	}
 
 	now := time.Now()
-	parseDuration := func(what string) time.Time {
-		str := cmd.Flag(what).Value.String()
-		if str == "" {
+	parseDuration := func(what, value string) time.Time {
+		if value == "" {
 			return time.Time{}
 		}
 
-		duration, err := time.ParseDuration(str)
+		duration, err := time.ParseDuration(value)
 		if err == nil {
 			return now.Add(-duration)
 		}
 
-		t, err := time.Parse(time.RFC3339, str)
+		t, err := time.Parse(time.RFC3339, value)
 		if err == nil {
 			return t
 		}
 
-		fmt.Printf("Invalid %s %s duration|time (must be of type .*(ns|us|ms|s|m|h) or RFC3339 ie 2017-02-13T09:16:57Z)\n", what, str)
+		fmt.Printf("Invalid %s %s duration|time (must be of type .*(ns|us|ms|s|m|h) or RFC3339 ie 2017-02-13T09:16:57Z)\n", what, value)
 		os.Exit(1)
 		return now
 	}
-	from := parseDuration("from")
-	to := parseDuration("to")
+	from := parseDuration("from", *fromRaw)
+	to := parseDuration("to", *toRaw)
 
-	if verbose {
+	if *verbose {
 		fmt.Printf("Return records between %s and %s\n", from, to)
 	}
 
-	delimiter := cmd.Flag("delimiter").Value.String()
-	fields, err := parseFields(cmd.Flag("fields").Value.String())
+	fields, err := parseFields(*fieldsRaw)
 	if err != nil {
 		fmt.Println("Invalid fields")
 		os.Exit(1)
@@ -109,9 +111,9 @@ func root(cmd *cobra.Command, args []string) {
 		var r *reader
 		var err error
 		if file == "-" {
-			r, err = newReader(os.Stdin, delimiter, from, to)
+			r, err = newReader(os.Stdin, *delimiter, from, to)
 		} else {
-			r, err = newReaderFile(file, delimiter, from, to)
+			r, err = newReaderFile(file, *delimiter, from, to)
 		}
 		if err != nil {
 			fmt.Println(err)
@@ -119,15 +121,22 @@ func root(cmd *cobra.Command, args []string) {
 		}
 		first := true
 		var firstTime, lastTime time.Time
+		var count int
 		for r.Read() {
 			if first {
 				first = false
 				firstTime = r.rec.timestamp
 			}
+			if *preview {
+				if count > 10 {
+					break
+				}
+				count = count + 1
+			}
 			lastTime = r.rec.timestamp
-			result(r.rec, delimiter, fields, output)
+			result(r.rec, *delimiter, fields, output)
 		}
-		if verbose {
+		if *verbose {
 			fmt.Printf("file %s time %s to %s\n", file, firstTime, lastTime)
 		}
 	}
@@ -234,7 +243,7 @@ func parse(delimiter byte, line []byte, rec *rec) error {
 
 func parseTime(delimiter byte, line []byte) (int, time.Time, error) {
 	space := 0
-	for space < len(line) && line[space] != ' ' && line[space] != delimiter {
+	for space < len(line) && line[space] != ' ' && line[space] != '\t' && line[space] != delimiter {
 		space = space + 1
 	}
 	date, err := time.Parse(time.RFC3339, string(line[0:space]))
@@ -262,10 +271,10 @@ func result(r rec, delimiter string, fields []int, out *bufio.Writer) {
 				} else {
 					out.WriteString(delimiter)
 				}
-				if field < 0 {
+				if fieldIndex < 0 {
 					out.WriteString(r.timestamp.Format(time.RFC3339))
 				} else {
-					out.Write(r.records[field-1])
+					out.Write(r.records[fieldIndex])
 				}
 			}
 		}

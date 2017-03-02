@@ -40,7 +40,7 @@ var toRaw *string
 var delimiter *string
 var fieldsRaw *string
 var cpuprofile *string
-var filter *[]string
+var filtersRaw *[]string
 var preview *bool
 var verbose *bool
 
@@ -49,7 +49,7 @@ func init() {
 	toRaw = RootCmd.Flags().StringP("to", "T", "", "Only include items until this time")
 	delimiter = RootCmd.Flags().StringP("delimiter", "d", "\t", "Field Delimiter")
 	fieldsRaw = RootCmd.Flags().StringP("fields", "f", "", "Only return fields (eg 1,2,3-4)")
-	filter = RootCmd.Flags().StringArray("filter", []string{}, "Filtering to perform")
+	filtersRaw = RootCmd.Flags().StringArray("filter", []string{}, "Filtering to perform")
 	cpuprofile = RootCmd.Flags().String("cpuprofile", "", "Write cpuprofile to file")
 	preview = RootCmd.Flags().Bool("preview", false, "Preview the result, only return 10 rows")
 	verbose = RootCmd.Flags().BoolP("verbose", "v", false, "Be verbose")
@@ -57,6 +57,7 @@ func init() {
 
 type rec struct {
 	timestamp time.Time
+	line      []byte
 	records   [][]byte
 }
 
@@ -105,6 +106,11 @@ func root(cmd *cobra.Command, args []string) {
 		fmt.Println("Invalid fields")
 		os.Exit(1)
 	}
+	filter, err := parseFilters(*verbose, *filtersRaw)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 
 	output := bufio.NewWriter(os.Stdout)
 	for _, file := range args {
@@ -123,6 +129,9 @@ func root(cmd *cobra.Command, args []string) {
 		var firstTime, lastTime time.Time
 		var count int
 		for r.Read() {
+			if !filter(r.rec) {
+				continue
+			}
 			if first {
 				first = false
 				firstTime = r.rec.timestamp
@@ -224,6 +233,7 @@ func parse(delimiter byte, line []byte, rec *rec) error {
 	if err != nil {
 		return err
 	}
+	rec.line = line
 	recs := rec.records[0:0]
 	current := 1
 	for last+current < len(line) {

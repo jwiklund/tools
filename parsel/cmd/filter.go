@@ -67,13 +67,17 @@ func filterMore(verbose bool, field int, filter string) filterFn {
 	filterNumber, err := strconv.ParseFloat(filter, 32)
 	if err == nil {
 		return func(r rec) bool {
-			if len(r.records) < field {
+			fieldIndex := field
+			if fieldIndex < 0 {
+				fieldIndex = len(r.records) + field
+			}
+			if (fieldIndex < 0) || (len(r.records) < fieldIndex) {
 				if verbose {
 					fmt.Println("filter.moreField:", field, filter, "too few records")
 				}
 				return false
 			}
-			value, err := strconv.ParseFloat(string(r.records[field]), 32)
+			value, err := strconv.ParseFloat(string(r.records[fieldIndex]), 32)
 			if err != nil {
 				if verbose {
 					fmt.Println("filter.moreField:", field, filter, "not a number")
@@ -91,13 +95,17 @@ func filterMore(verbose bool, field int, filter string) filterFn {
 	}
 	filterBytes := []byte(filter)
 	return func(r rec) bool {
-		if len(r.records) < field {
+		fieldIndex := field
+		if fieldIndex < 0 {
+			fieldIndex = len(r.records) + field
+		}
+		if (fieldIndex < 0) || (len(r.records) < fieldIndex) {
 			if verbose {
 				fmt.Println("filter.moreField:", field, filter, "too few records")
 			}
 			return false
 		}
-		res := bytes.Compare(r.records[field], filterBytes) > 0
+		res := bytes.Compare(r.records[fieldIndex], filterBytes) > 0
 		if verbose {
 			fmt.Println("filter.moreField:", field, string(r.records[field]), "<", filter, res)
 		}
@@ -109,13 +117,17 @@ func filterLess(verbose bool, field int, filter string) filterFn {
 	filterNumber, err := strconv.ParseFloat(filter, 32)
 	if err == nil {
 		return func(r rec) bool {
-			if len(r.records) < field {
+			fieldIndex := field
+			if fieldIndex < 0 {
+				fieldIndex = len(r.records) + field
+			}
+			if (fieldIndex < 0) || (len(r.records) < fieldIndex) {
 				if verbose {
 					fmt.Println("filter.lessField:", field, filter, "too few records")
 				}
 				return false
 			}
-			value, err := strconv.ParseFloat(string(r.records[field]), 32)
+			value, err := strconv.ParseFloat(string(r.records[fieldIndex]), 32)
 			if err != nil {
 				if verbose {
 					fmt.Println("filter.lessField:", field, filter, "not a number")
@@ -131,17 +143,19 @@ func filterLess(verbose bool, field int, filter string) filterFn {
 	}
 	filterBytes := []byte(filter)
 	return func(r rec) bool {
-		if len(r.records) < field {
+		fieldIndex := field
+		if fieldIndex < 0 {
+			fieldIndex = len(r.records) + field
+		}
+		if (fieldIndex < 0) || (len(r.records) < fieldIndex) {
 			if verbose {
-				fmt.Println("filter:", filter, "too few records")
+				fmt.Println("filter.lessField:", field, filter, "too few records")
 			}
 			return false
 		}
-		res := bytes.Compare(r.records[field], filterBytes) < 0
+		res := bytes.Compare(r.records[fieldIndex], filterBytes) < 0
 		if verbose {
-			if verbose {
-				fmt.Println("filter.lessField:", field, string(r.records[field]), "<", filter, res)
-			}
+			fmt.Println("filter.lessField:", field, string(r.records[fieldIndex]), "<", filter, res)
 		}
 		return res
 	}
@@ -150,15 +164,19 @@ func filterLess(verbose bool, field int, filter string) filterFn {
 func filterField(verbose bool, field int, filter string) filterFn {
 	filterBytes := []byte(filter)
 	return func(r rec) bool {
-		if len(r.records) <= field {
+		fieldIndex := field
+		if fieldIndex < 0 {
+			fieldIndex = len(r.records) + field
+		}
+		if (fieldIndex < 0) || (len(r.records) <= fieldIndex) {
 			if verbose {
-				fmt.Println("filter:", filter, "too few records")
+				fmt.Println("filter.lessField:", field, filter, "too few records")
 			}
 			return false
 		}
-		res := bytes.Equal(r.records[field], filterBytes)
+		res := bytes.Equal(r.records[fieldIndex], filterBytes)
 		if verbose {
-			fmt.Println("filter.field:", field, filter, "=", string(r.records[field]), res)
+			fmt.Println("filter.field:", field, filter, "=", string(r.records[fieldIndex]), res)
 		}
 		return res
 	}

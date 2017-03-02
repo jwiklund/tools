@@ -40,6 +40,15 @@ func TestFilterFieldMore(t *testing.T) {
 	testFilter(t, "b", "0:>c", false)
 }
 
+func TestFilterLast(t *testing.T) {
+	testFilter(t, "0 1", "-1:1", true)
+	testFilter(t, "0 1", "-1:0", false)
+	testFilter(t, "0 1", "-1:<2", true)
+	testFilter(t, "0 1", "-1:<1", false)
+	testFilter(t, "0 1", "-1:>0", true)
+	testFilter(t, "0 1", "-1:>1", false)
+}
+
 func testFilter(t *testing.T, row string, filter string, expect bool) {
 	line := []byte("2017-03-01T16:02:04Z " + row)
 	var r rec

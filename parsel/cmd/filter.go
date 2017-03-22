@@ -44,6 +44,11 @@ func parseFilter(verbose bool, filter string) (filterFn, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not parse field index %s: %v", filter[0:colon], err)
 	}
+	if field == 0 {
+		return nil, fmt.Errorf("Invalid index, 0 is for date and is non filterable")
+	} else if field > 0 {
+		field = field - 1
+	}
 	fieldFilter := filter[colon+1:]
 	if fieldFilter[0] == '<' {
 		return filterLess(verbose, field, fieldFilter[1:]), nil
@@ -174,9 +179,9 @@ func filterField(verbose bool, field int, filter string) filterFn {
 			}
 			return false
 		}
-		res := bytes.Equal(r.records[fieldIndex], filterBytes)
+		res := bytes.Contains(r.records[fieldIndex], filterBytes)
 		if verbose {
-			fmt.Println("filter.field:", field, filter, "=", string(r.records[fieldIndex]), res)
+			fmt.Println("filter.field:", field, filter, "contains", string(r.records[fieldIndex]), res)
 		}
 		return res
 	}

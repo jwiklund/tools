@@ -13,31 +13,31 @@ func TestFilterLine(t *testing.T) {
 }
 
 func TestFilterField(t *testing.T) {
-	testFilter(t, "a line", "0:a", true)
-	testFilter(t, "a line", "1:a", false)
-	testFilter(t, "a line", "0:line", false)
-	testFilter(t, "a line", "1:line", true)
-	testFilter(t, "a line", "2:out of bounds", false)
+	testFilter(t, "a line", "1:a", true)
+	testFilter(t, "a line", "2:a", false)
+	testFilter(t, "a line", "1:line", false)
+	testFilter(t, "a line", "2:line", true)
+	testFilter(t, "a line", "3:out of bounds", false)
 }
 
 func TestFilterFieldLess(t *testing.T) {
-	testFilter(t, "10", "0:<9", false)
-	testFilter(t, "10", "0:<10", false)
-	testFilter(t, "10", "0:<10.1", true)
-	testFilter(t, "10", "0:<11", true)
-	testFilter(t, "b", "0:<a", false)
-	testFilter(t, "b", "0:<b", false)
-	testFilter(t, "b", "0:<c", true)
+	testFilter(t, "10", "1:<9", false)
+	testFilter(t, "10", "1:<10", false)
+	testFilter(t, "10", "1:<10.1", true)
+	testFilter(t, "10", "1:<11", true)
+	testFilter(t, "b", "1:<a", false)
+	testFilter(t, "b", "1:<b", false)
+	testFilter(t, "b", "1:<c", true)
 }
 
 func TestFilterFieldMore(t *testing.T) {
-	testFilter(t, "10", "0:>9", true)
-	testFilter(t, "10.1", "0:>10", true)
-	testFilter(t, "10", "0:>10", false)
-	testFilter(t, "10", "0:>11", false)
-	testFilter(t, "b", "0:>a", true)
-	testFilter(t, "b", "0:>b", false)
-	testFilter(t, "b", "0:>c", false)
+	testFilter(t, "10", "1:>9", true)
+	testFilter(t, "10.1", "1:>10", true)
+	testFilter(t, "10", "1:>10", false)
+	testFilter(t, "10", "1:>11", false)
+	testFilter(t, "b", "1:>a", true)
+	testFilter(t, "b", "1:>b", false)
+	testFilter(t, "b", "1:>c", false)
 }
 
 func TestFilterLast(t *testing.T) {
@@ -47,6 +47,10 @@ func TestFilterLast(t *testing.T) {
 	testFilter(t, "0 1", "-1:<1", false)
 	testFilter(t, "0 1", "-1:>0", true)
 	testFilter(t, "0 1", "-1:>1", false)
+}
+
+func TestFilterContains(t *testing.T) {
+	testFilter(t, "a line", "2:in", true)
 }
 
 func testFilter(t *testing.T, row string, filter string, expect bool) {

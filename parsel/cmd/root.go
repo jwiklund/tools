@@ -137,6 +137,9 @@ func root(cmd *cobra.Command, args []string) {
 				firstTime = r.rec.timestamp
 			}
 			if *preview {
+				if count == 0 {
+					printFieldIndexes(r.rec, *delimiter, fields, output)
+				}
 				if count > 10 {
 					break
 				}
@@ -281,11 +284,47 @@ func result(r rec, delimiter string, fields []int, out *bufio.Writer) {
 				} else {
 					out.WriteString(delimiter)
 				}
-				if fieldIndex < 0 {
+				if fieldIndex == -1 {
 					out.WriteString(r.timestamp.Format(time.RFC3339))
+				}
+				if fieldIndex < 0 {
+					negativeRewrite := len(r.records) + fieldIndex + 1
+					if negativeRewrite >= 0 && negativeRewrite < len(r.records) {
+						out.Write(r.records[negativeRewrite])
+					}
 				} else {
 					out.Write(r.records[fieldIndex])
 				}
+			}
+		}
+	}
+	out.WriteString("\n")
+}
+
+func printFieldIndexes(r rec, delimiter string, fields []int, out *bufio.Writer) {
+	if len(fields) == 0 {
+		out.WriteString(fmt.Sprintf("%3d\t%s\n", 0, r.timestamp.Format(time.RFC3339)))
+		for i, rec := range r.records {
+			out.WriteString(fmt.Sprintf("%3d\t%s\n", i+1, rec))
+		}
+	} else {
+		for _, field := range fields {
+			fieldIndex := field - 1
+			if fieldIndex < len(r.records) {
+				if fieldIndex == -1 {
+					out.WriteString(fmt.Sprintf("%3d\t%s\n", field, r.timestamp.Format(time.RFC3339)))
+				} else if fieldIndex < 0 {
+					negativeRewrite := len(r.records) + fieldIndex + 1
+					if negativeRewrite >= 0 && negativeRewrite < len(r.records) {
+						out.WriteString(fmt.Sprintf("%3d\t%s\n", field, r.records[negativeRewrite]))
+					} else {
+						out.WriteString(fmt.Sprintf("%3d\tOut of range\n", field))
+					}
+				} else {
+					out.WriteString(fmt.Sprintf("%3d\t%s\n", field, r.records[fieldIndex]))
+				}
+			} else {
+				out.WriteString(fmt.Sprintf("%3d\tOut of range\n", field))
 			}
 		}
 	}

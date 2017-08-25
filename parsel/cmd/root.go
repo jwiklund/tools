@@ -106,7 +106,7 @@ func root(cmd *cobra.Command, args []string) {
 		fmt.Println("Invalid fields")
 		os.Exit(1)
 	}
-	filter, err := parseFilters(*verbose, *filtersRaw)
+	filter, err := parseFilters(*verbose, *delimiter, *filtersRaw)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

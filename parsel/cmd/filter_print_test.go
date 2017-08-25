@@ -13,7 +13,7 @@ func TestFilterResultIndex(t *testing.T) {
 	if err != nil {
 		t.Fatal("Invalid field", err)
 	}
-	filter, err := parseFilter(false, "5:5")
+	filter, err := parseFilter(false, "  ", "5:5")
 	if err != nil {
 		t.Fatal("Invalid filter", err)
 	}

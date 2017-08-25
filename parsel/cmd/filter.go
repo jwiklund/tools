@@ -17,12 +17,12 @@ func (f filterFn) and(s filterFn) filterFn {
 	}
 }
 
-func parseFilters(verbose bool, filters []string) (filterFn, error) {
+func parseFilters(verbose bool, delimiter string, filters []string) (filterFn, error) {
 	fn := filterFn(func(_ rec) bool {
 		return true
 	})
 	for _, filter := range filters {
-		nfn, err := parseFilter(verbose, filter)
+		nfn, err := parseFilter(verbose, delimiter, filter)
 		if err != nil {
 			return nil, err
 		}
@@ -32,10 +32,10 @@ func parseFilters(verbose bool, filters []string) (filterFn, error) {
 	return fn, nil
 }
 
-func parseFilter(verbose bool, filter string) (filterFn, error) {
+func parseFilter(verbose bool, delimiter, filter string) (filterFn, error) {
 	colon := strings.Index(filter, ":")
 	if colon < 0 {
-		return filterContains(verbose, []byte(filter)), nil
+		return maybeNot(verbose, delimiter, filter, filterContains), nil
 	}
 	if colon == len(filter)-1 {
 		return nil, errors.Errorf("missing filter for field %s", filter)
@@ -50,17 +50,52 @@ func parseFilter(verbose bool, filter string) (filterFn, error) {
 		field = field - 1
 	}
 	fieldFilter := filter[colon+1:]
-	if fieldFilter[0] == '<' {
-		return filterLess(verbose, field, fieldFilter[1:]), nil
-	} else if fieldFilter[0] == '>' {
-		return filterMore(verbose, field, fieldFilter[1:]), nil
-	}
-	return filterField(verbose, field, fieldFilter), nil
+	return maybeNot(verbose, delimiter, fieldFilter, func(v bool, d string, f string) filterFn {
+		if f[0] == '<' {
+			return filterLess(verbose, field, f[1:])
+		} else if f[0] == '>' {
+			return filterMore(verbose, field, f[1:])
+		}
+		return filterField(verbose, field, f)
+	}), nil
 }
 
-func filterContains(verbose bool, filter []byte) filterFn {
+func maybeNot(verbose bool, delimiter string, filter string, filterCreator func(bool, string, string) filterFn) filterFn {
+	not := false
+	if filter[0] == '!' {
+		not = true
+		filter = filter[1:]
+	}
+	fn := filterCreator(verbose, delimiter, filter)
+	if not {
+		return func(r rec) bool {
+			res := !fn(r)
+			if verbose {
+				fmt.Println("filter.not", filter, ":", res)
+			}
+			return res
+		}
+	}
+	return fn
+}
+
+func filterContains(verbose bool, delimiter string, filter string) filterFn {
+	if filter[0] == '^' {
+		filter = delimiter + filter[1:]
+	}
+	var original []byte
+	if filter[len(filter)-1] == '$' {
+		original = []byte(filter[0 : len(filter)-1])
+		filter = string(original) + delimiter
+	}
+	find := []byte(filter)
 	return func(r rec) bool {
-		res := bytes.Contains(r.line, filter)
+		res := bytes.Contains(r.line, find)
+		if !res && original != nil {
+			if len(r.line) >= len(original) {
+				res = bytes.Equal(r.line[len(r.line)-len(original):], original)
+			}
+		}
 		if verbose {
 			fmt.Println("filter: ", string(filter), res)
 		}
@@ -76,7 +111,7 @@ func filterMore(verbose bool, field int, filter string) filterFn {
 			if fieldIndex < 0 {
 				fieldIndex = len(r.records) + field
 			}
-			if (fieldIndex < 0) || (len(r.records) < fieldIndex) {
+			if (fieldIndex < 0) || (len(r.records) <= fieldIndex) {
 				if verbose {
 					fmt.Println("filter.moreField:", field, filter, "too few records")
 				}
@@ -126,7 +161,7 @@ func filterLess(verbose bool, field int, filter string) filterFn {
 			if fieldIndex < 0 {
 				fieldIndex = len(r.records) + field
 			}
-			if (fieldIndex < 0) || (len(r.records) < fieldIndex) {
+			if (fieldIndex < 0) || (len(r.records) <= fieldIndex) {
 				if verbose {
 					fmt.Println("filter.lessField:", field, filter, "too few records")
 				}
@@ -167,7 +202,33 @@ func filterLess(verbose bool, field int, filter string) filterFn {
 }
 
 func filterField(verbose bool, field int, filter string) filterFn {
-	filterBytes := []byte(filter)
+	var compareFn func([]byte) bool
+
+	if filter[0] == '^' {
+		filterBytes := []byte(filter[1:])
+		filterLen := len(filterBytes)
+		compareFn = func(bs []byte) bool {
+			if len(bs) < filterLen {
+				return false
+			}
+			return bytes.Equal(bs[0:filterLen], filterBytes)
+		}
+	} else if filter[len(filter)-1] == '$' {
+		filterBytes := []byte(filter[0 : len(filter)-1])
+		filterLen := len(filterBytes)
+		compareFn = func(bs []byte) bool {
+			if len(bs) < filterLen {
+				return false
+			}
+			return bytes.Equal(bs[len(bs)-filterLen:], filterBytes)
+		}
+	} else {
+		filterBytes := []byte(filter)
+		compareFn = func(bs []byte) bool {
+			return bytes.Contains(bs, filterBytes)
+		}
+	}
+
 	return func(r rec) bool {
 		fieldIndex := field
 		if fieldIndex < 0 {
@@ -175,11 +236,11 @@ func filterField(verbose bool, field int, filter string) filterFn {
 		}
 		if (fieldIndex < 0) || (len(r.records) <= fieldIndex) {
 			if verbose {
-				fmt.Println("filter.lessField:", field, filter, "too few records")
+				fmt.Println("filter.field:", field, filter, "too few records")
 			}
 			return false
 		}
-		res := bytes.Contains(r.records[fieldIndex], filterBytes)
+		res := compareFn(r.records[fieldIndex])
 		if verbose {
 			fmt.Println("filter.field:", field, filter, "contains", string(r.records[fieldIndex]), res)
 		}

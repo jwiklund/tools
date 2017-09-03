@@ -12,14 +12,17 @@ import (
 	"time"
 )
 
-var FromRaw *string
-var ToRaw *string
-var Delimiter *string
-var FieldsRaw *string
-var Cpuprofile *string
-var FiltersRaw *[]string
-var Preview *bool
-var Verbose *bool
+type Args struct {
+	From       string
+	To         string
+	Delimiter  string
+	Fields     string
+	Cpuprofile string
+	Filters    []string
+	Preview    bool
+	Verbose    bool
+	Args       []string
+}
 
 type rec struct {
 	timestamp time.Time
@@ -27,12 +30,12 @@ type rec struct {
 	records   [][]byte
 }
 
-func Parsel(args []string) {
-	if *Cpuprofile != "" {
-		if *Verbose {
-			fmt.Println("Storing cpu profile in " + *Cpuprofile)
+func Parsel(args *Args) {
+	if args.Cpuprofile != "" {
+		if args.Verbose {
+			fmt.Println("Storing cpu profile in " + args.Cpuprofile)
 		}
-		f, err := os.Create(*Cpuprofile)
+		f, err := os.Create(args.Cpuprofile)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -60,32 +63,32 @@ func Parsel(args []string) {
 		os.Exit(1)
 		return now
 	}
-	from := parseDuration("from", *FromRaw)
-	to := parseDuration("to", *ToRaw)
+	from := parseDuration("from", args.From)
+	to := parseDuration("to", args.To)
 
-	if *Verbose {
+	if args.Verbose {
 		fmt.Printf("Return records between %s and %s\n", from, to)
 	}
 
-	fields, err := parseFields(*FieldsRaw)
+	fields, err := parseFields(args.Fields)
 	if err != nil {
 		fmt.Println("Invalid fields")
 		os.Exit(1)
 	}
-	filter, err := parseFilters(*Verbose, *Delimiter, *FiltersRaw)
+	filter, err := parseFilters(args.Verbose, args.Delimiter, args.Filters)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
 	output := bufio.NewWriter(os.Stdout)
-	for _, file := range args {
+	for _, file := range args.Args {
 		var r *reader
 		var err error
 		if file == "-" {
-			r, err = newReader(os.Stdin, *Delimiter, from, to)
+			r, err = newReader(os.Stdin, args.Delimiter, from, to)
 		} else {
-			r, err = newReaderFile(file, *Delimiter, from, to)
+			r, err = newReaderFile(file, args.Delimiter, from, to)
 		}
 		if err != nil {
 			fmt.Println(err)
@@ -102,9 +105,9 @@ func Parsel(args []string) {
 				first = false
 				firstTime = r.rec.timestamp
 			}
-			if *Preview {
+			if args.Preview {
 				if count == 0 {
-					printFieldIndexes(r.rec, *Delimiter, fields, output)
+					printFieldIndexes(r.rec, args.Delimiter, fields, output)
 				}
 				if count > 10 {
 					break
@@ -112,9 +115,9 @@ func Parsel(args []string) {
 				count = count + 1
 			}
 			lastTime = r.rec.timestamp
-			result(r.rec, *Delimiter, fields, output)
+			result(r.rec, args.Delimiter, fields, output)
 		}
-		if *Verbose {
+		if args.Verbose {
 			fmt.Printf("file %s time %s to %s\n", file, firstTime, lastTime)
 		}
 	}

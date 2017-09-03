@@ -11,7 +11,7 @@ var (
 	app        = kingpin.New("filter", "Filter logs")
 	fromRaw    = app.Flag("from", "Only include items from this time").Short('F').String()
 	toRaw      = app.Flag("to", "Only include items until this time").Short('T').String()
-	delimiter  = app.Flag("delimiter", "Field delimiter").Short('d').String()
+	delimiter  = app.Flag("delimiter", "Field delimiter").Default("\t").Short('d').String()
 	fieldsRaw  = app.Flag("fields", "Only return fields (eg 1,2,3-4)").Short('f').String()
 	filtersRaw = app.Flag("filter", "Filtering to perform").Strings()
 	cpuprofile = app.Flag("cpuprofile", "Write cpuprofile to file").String()

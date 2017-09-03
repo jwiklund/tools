@@ -10,50 +10,16 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/spf13/cobra"
 )
 
-var cfgFile string
-
-// RootCmd represents the base command when called without any subcommands
-var RootCmd = &cobra.Command{
-	Use:   "parsel",
-	Short: "Parse and search logs",
-	Long:  `Parse and search logs`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	Run: root,
-}
-
-// Execute adds all child commands to the root command sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
-	if err := RootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(-1)
-	}
-}
-
-var fromRaw *string
-var toRaw *string
-var delimiter *string
-var fieldsRaw *string
-var cpuprofile *string
-var filtersRaw *[]string
-var preview *bool
-var verbose *bool
-
-func init() {
-	fromRaw = RootCmd.Flags().StringP("from", "F", "", "Only include items from this time")
-	toRaw = RootCmd.Flags().StringP("to", "T", "", "Only include items until this time")
-	delimiter = RootCmd.Flags().StringP("delimiter", "d", "\t", "Field Delimiter")
-	fieldsRaw = RootCmd.Flags().StringP("fields", "f", "", "Only return fields (eg 1,2,3-4)")
-	filtersRaw = RootCmd.Flags().StringArray("filter", []string{}, "Filtering to perform")
-	cpuprofile = RootCmd.Flags().String("cpuprofile", "", "Write cpuprofile to file")
-	preview = RootCmd.Flags().Bool("preview", false, "Preview the result, only return 10 rows")
-	verbose = RootCmd.Flags().BoolP("verbose", "v", false, "Be verbose")
-}
+var FromRaw *string
+var ToRaw *string
+var Delimiter *string
+var FieldsRaw *string
+var Cpuprofile *string
+var FiltersRaw *[]string
+var Preview *bool
+var Verbose *bool
 
 type rec struct {
 	timestamp time.Time
@@ -61,12 +27,12 @@ type rec struct {
 	records   [][]byte
 }
 
-func root(cmd *cobra.Command, args []string) {
-	if *cpuprofile != "" {
-		if *verbose {
-			fmt.Println("Storing cpu profile in " + *cpuprofile)
+func Parsel(args []string) {
+	if *Cpuprofile != "" {
+		if *Verbose {
+			fmt.Println("Storing cpu profile in " + *Cpuprofile)
 		}
-		f, err := os.Create(*cpuprofile)
+		f, err := os.Create(*Cpuprofile)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -94,19 +60,19 @@ func root(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 		return now
 	}
-	from := parseDuration("from", *fromRaw)
-	to := parseDuration("to", *toRaw)
+	from := parseDuration("from", *FromRaw)
+	to := parseDuration("to", *ToRaw)
 
-	if *verbose {
+	if *Verbose {
 		fmt.Printf("Return records between %s and %s\n", from, to)
 	}
 
-	fields, err := parseFields(*fieldsRaw)
+	fields, err := parseFields(*FieldsRaw)
 	if err != nil {
 		fmt.Println("Invalid fields")
 		os.Exit(1)
 	}
-	filter, err := parseFilters(*verbose, *delimiter, *filtersRaw)
+	filter, err := parseFilters(*Verbose, *Delimiter, *FiltersRaw)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -117,9 +83,9 @@ func root(cmd *cobra.Command, args []string) {
 		var r *reader
 		var err error
 		if file == "-" {
-			r, err = newReader(os.Stdin, *delimiter, from, to)
+			r, err = newReader(os.Stdin, *Delimiter, from, to)
 		} else {
-			r, err = newReaderFile(file, *delimiter, from, to)
+			r, err = newReaderFile(file, *Delimiter, from, to)
 		}
 		if err != nil {
 			fmt.Println(err)
@@ -136,9 +102,9 @@ func root(cmd *cobra.Command, args []string) {
 				first = false
 				firstTime = r.rec.timestamp
 			}
-			if *preview {
+			if *Preview {
 				if count == 0 {
-					printFieldIndexes(r.rec, *delimiter, fields, output)
+					printFieldIndexes(r.rec, *Delimiter, fields, output)
 				}
 				if count > 10 {
 					break
@@ -146,9 +112,9 @@ func root(cmd *cobra.Command, args []string) {
 				count = count + 1
 			}
 			lastTime = r.rec.timestamp
-			result(r.rec, *delimiter, fields, output)
+			result(r.rec, *Delimiter, fields, output)
 		}
-		if *verbose {
+		if *Verbose {
 			fmt.Printf("file %s time %s to %s\n", file, firstTime, lastTime)
 		}
 	}

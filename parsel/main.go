@@ -20,7 +20,7 @@ func main() {
 	app.Flag("cpuprofile", "Write cpuprofile to file").StringVar(&args.Cpuprofile)
 	app.Flag("preview", "Preview the result, only return 10 rows").Short('p').BoolVar(&args.Preview)
 	app.Flag("verbose", "Be verbose").Short('v').BoolVar(&args.Verbose)
-	app.Arg("files", "Files to read").Required().StringsVar(&args.Args)
+	app.Arg("files", "Files to read (stdin for stdin)").Required().StringsVar(&args.Args)
 	app.HelpFlag.Short('h')
 
 	kingpin.MustParse(app.Parse(os.Args[1:]))

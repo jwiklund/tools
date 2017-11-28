@@ -85,7 +85,7 @@ func Parsel(args *Args) {
 	for _, file := range args.Args {
 		var r *reader
 		var err error
-		if file == "-" {
+		if file == "-" || file == "stdin" {
 			r, err = newReader(os.Stdin, args.Delimiter, from, to)
 		} else {
 			r, err = newReaderFile(file, args.Delimiter, from, to)
